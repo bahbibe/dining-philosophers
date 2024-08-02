@@ -12,11 +12,36 @@
 
 #include "philo.h"
 
-void	printing(t_philo *philo, char *msg, unsigned long time)
+void	assign_forks(t_philo *philo)
+{
+	if (philo->id == philo->data->n_ph)
+	{
+		pthread_mutex_lock(&philo->data->fork[philo->id % philo->data->n_ph]);
+		printing(philo, "has taken a fork", get_time() - philo->data->t0);
+		pthread_mutex_lock(&philo->data->fork[philo->id - 1]);
+		printing(philo, "has taken a fork", get_time() - philo->data->t0);
+	}
+	else
+	{
+		pthread_mutex_lock(&philo->data->fork[philo->id - 1]);
+		printing(philo, "has taken a fork", get_time() - philo->data->t0);
+		pthread_mutex_lock(&philo->data->fork[philo->id % philo->data->n_ph]);
+		printing(philo, "has taken a fork", get_time() - philo->data->t0);
+	}
+}
+
+void	print_dead(t_philo *philo)
 {
 	pthread_mutex_lock(&philo->data->mutex);
-	printf("%ld ms %d %s \n", time, philo->id, msg);
+	printf("%ld ms %d %s \n", \
+			(get_time() - philo->data->t0), philo->id, "died");
 	pthread_mutex_unlock(&philo->data->mutex);
+	pthread_mutex_lock(&philo->data->simulation);
+	philo->data->end_simulation = 0;
+	pthread_mutex_lock(&philo->data->mutex);
+	philo->data->print = 0;
+	pthread_mutex_unlock(&philo->data->mutex);
+	pthread_mutex_unlock(&philo->data->simulation);
 }
 
 int	death(t_philo *philo)
@@ -37,9 +62,8 @@ int	death(t_philo *philo)
 		t = philo[i].last_eat;
 		if ((unsigned long)philo[i].data->die_time <= get_time() - t)
 		{
-			pthread_mutex_lock(&philo->data->mutex);
-			printf("%ld ms %d %s \n", (get_time()
-					- philo->data->t0), philo->id, "died");
+			print_dead(&philo[i]);
+			pthread_mutex_unlock(&philo->data->eat);
 			return (1);
 		}
 		pthread_mutex_unlock(&philo->data->eat);
@@ -50,10 +74,7 @@ int	death(t_philo *philo)
 
 void	spaghetti(t_philo *philo)
 {
-	pthread_mutex_lock(&philo->data->fork[philo->id - 1]);
-	printing(philo, "has taken a fork", get_time() - philo->data->t0);
-	pthread_mutex_lock(&philo->data->fork[philo->id % philo->data->n_ph]);
-	printing(philo, "has taken a fork", get_time() - philo->data->t0);
+	assign_forks(philo);
 	printing(philo, "is eating", get_time() - philo->data->t0);
 	timer(philo->data->eat_time);
 	pthread_mutex_lock(&philo->data->eat);
@@ -72,9 +93,13 @@ void	spaghetti(t_philo *philo)
 void	*simulate(void *arg)
 {
 	t_philo	*philo;
+	int		end;
 
 	philo = (t_philo *)arg;
-	while (1)
+	pthread_mutex_lock(&philo->data->simulation);
+	end = philo->data->end_simulation;
+	pthread_mutex_unlock(&philo->data->simulation);
+	while (end)
 	{
 		pthread_mutex_lock(&philo->data->meals);
 		if (philo->nb_meals == 0)
@@ -85,30 +110,9 @@ void	*simulate(void *arg)
 		}
 		pthread_mutex_unlock(&philo->data->meals);
 		spaghetti(philo);
+		pthread_mutex_lock(&philo->data->simulation);
+		end = philo->data->end_simulation;
+		pthread_mutex_unlock(&philo->data->simulation);
 	}
 	return (NULL);
-}
-
-int	creat_philo(t_philo *philo)
-{
-	int	i;
-
-	i = 0;
-	while (i < philo[0].data->n_ph)
-	{
-		if (pthread_create(&philo[i].thread, NULL, &simulate, &philo[i]))
-			return (printf("error creating philos"));
-		pthread_detach(philo[i].thread);
-		i += 2;
-	}
-	usleep(10);
-	i = 1;
-	while (i < philo[0].data->n_ph)
-	{
-		if (pthread_create(&philo[i].thread, NULL, &simulate, &philo[i]))
-			return (printf("error creating philos"));
-		pthread_detach(philo[i].thread);
-		i += 2;
-	}
-	return (0);
 }

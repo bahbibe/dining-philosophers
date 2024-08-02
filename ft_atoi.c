@@ -13,7 +13,7 @@
 #include "philo.h"
 
 int	ft_is_space(int c)
-{	
+{
 	return (c == '\f' || c == '\n' || c == '\r' \
 	|| c == '\t' || c == '\v' || c == ' ');
 }

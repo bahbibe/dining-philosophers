@@ -25,38 +25,36 @@ int	get_arg(char *arg)
 
 int	check_args(char **av)
 {
-	int	i;
-
-	i = 0;
 	while (*(++av))
 		if (get_arg(*av) <= 0)
 			return (printf("./philo: positive numeric argument required\n"));
 	return (0);
 }
 
-void	error(void)
+void	printing(t_philo *philo, char *msg, unsigned long time)
 {
-	printf("Usage: "RED"./philo "YELLOW"[number_of_philosophers] \
-[time_to_die] [time_to_eat] [time_to_sleep] \
-"CYAN"[number_of_times_each_philosopher_must_eat \
-(optional)]\n"RESET);
+	pthread_mutex_lock(&philo->data->mutex);
+	if (philo->data->print == 1)
+		printf("%ld ms %d %s \n", time, philo->id, msg);
+	pthread_mutex_unlock(&philo->data->mutex);
 }
 
 void	init_data(t_philo *philo, char **av, t_data *data)
 {
 	int	i;
 
-	i = 0;
+	i = -1;
 	data->n_ph = ft_atoi(av[1]);
 	data->die_time = (unsigned int)ft_atoi(av[2]);
 	data->eat_time = (unsigned int)ft_atoi(av[3]);
 	data->sleep_time = (unsigned int)ft_atoi(av[4]);
-	data->fork = (pthread_mutex_t *)malloc(data->n_ph
-			* sizeof(pthread_mutex_t));
+	data->fork = \
+		(pthread_mutex_t *)malloc(data->n_ph * sizeof(pthread_mutex_t));
 	pthread_mutex_init(&data->mutex, NULL);
 	pthread_mutex_init(&data->eat, NULL);
 	pthread_mutex_init(&data->meals, NULL);
-	while (i < data->n_ph)
+	pthread_mutex_init(&data->simulation, NULL);
+	while (++i < data->n_ph)
 	{
 		philo[i].id = i + 1;
 		philo[i].last_eat = get_time();
@@ -66,7 +64,6 @@ void	init_data(t_philo *philo, char **av, t_data *data)
 		if (av[5])
 			philo[i].nb_meals = ft_atoi(av[5]);
 		philo[i].finish = 0;
-		i++;
 	}
 	data->t0 = get_time();
 }

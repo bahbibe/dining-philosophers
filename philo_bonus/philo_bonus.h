@@ -12,13 +12,14 @@
 # include <pthread.h>
 # include <semaphore.h>
 # include <stdatomic.h>
+# include <stdint.h>
 
 # define USAGE "Usage: ./philo_bonus number_of_philosophers time_to_die " \
 	"time_to_eat time_to_sleep [number_of_times_each_philosopher_must_eat]\n"
 
 # define SEM_FORK_PREFIX "/philo_bonus_fork_"
-# define SEM_ROOM "/philo_bonus_room"
-# define SEM_PRINT "/philo_bonus_print"
+# define SEM_ROOM_PREFIX "/philo_bonus_room_"
+# define SEM_PRINT_PREFIX "/philo_bonus_print_"
 
 /*
 ** Each philosopher is its own process; forks are named semaphores so
@@ -26,19 +27,28 @@
 ** ("no state in memory" per the subject). `room`, sized n_ph - 1, is the
 ** same deadlock-avoidance gate as the mandatory part's room.c: at most
 ** n_ph - 1 processes may hold forks at once, so at least one can always
-** get both of theirs.
+** get both of theirs. `instance_id` is folded into every semaphore's
+** name so two runs started at once on the same machine never collide on
+** the same name. getpid() would be the obvious source of that
+** uniqueness but isn't in the bonus's authorized function list, so it's
+** built instead from a gettimeofday() microsecond timestamp mixed with
+** the caller's own stack address (ASLR-randomized per process, and free
+** since it's a language operation, not a function call) — belt and
+** braces, since two runs launched back-to-back from the same script can
+** land in the same microsecond on their own.
 */
 typedef struct s_data
 {
-	sem_t	**forks;
-	sem_t	*room;
-	sem_t	*print_lock;
-	int		n_ph;
-	int		die_time;
-	int		eat_time;
-	int		sleep_time;
-	int		must_eat;
-	long	t0;
+	sem_t			**forks;
+	sem_t			*room;
+	sem_t			*print_lock;
+	int				n_ph;
+	int				die_time;
+	int				eat_time;
+	int				sleep_time;
+	int				must_eat;
+	long			t0;
+	unsigned long	instance_id;
 }	t_data;
 
 /*
@@ -73,6 +83,7 @@ void	destroy_data(t_data *data);
 
 /* time_utils.c */
 long	get_time(void);
+long	unique_id(void);
 void	precise_sleep(int ms);
 
 /* print.c */

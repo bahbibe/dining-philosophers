@@ -1,29 +1,45 @@
 #include "philo_bonus.h"
 
-/*
-** Builds "/philo_bonus_fork_<i>" into buf. Hand-rolled instead of
-** strcpy/snprintf: neither is in the bonus's authorized function list.
-*/
-static void	fork_name(char *buf, int i)
+static int	append_str(char *buf, int pos, const char *s)
 {
-	char	*prefix;
-	char	digits[16];
-	int		n_digits;
-	int	pos;
+	while (*s)
+		buf[pos++] = *s++;
+	return (pos);
+}
 
-	prefix = SEM_FORK_PREFIX;
-	for (pos = 0; prefix[pos]; pos++)
-		buf[pos] = prefix[pos];
+static int	append_uint(char *buf, int pos, unsigned long n)
+{
+	char	digits[20];
+	int		n_digits;
+
 	n_digits = 0;
-	if (i == 0)
+	if (n == 0)
 		digits[n_digits++] = '0';
-	while (i > 0)
+	while (n > 0)
 	{
-		digits[n_digits++] = '0' + (i % 10);
-		i /= 10;
+		digits[n_digits++] = '0' + (n % 10);
+		n /= 10;
 	}
 	while (n_digits > 0)
 		buf[pos++] = digits[--n_digits];
+	return (pos);
+}
+
+/*
+** Builds "<prefix><instance_id>[_<idx>]" into buf. Hand-rolled instead of
+** strcpy/snprintf: neither is in the bonus's authorized function list.
+*/
+static void	sem_name(char *buf, const char *prefix, unsigned long id, int idx)
+{
+	int	pos;
+
+	pos = append_str(buf, 0, prefix);
+	pos = append_uint(buf, pos, id);
+	if (idx >= 0)
+	{
+		buf[pos++] = '_';
+		pos = append_uint(buf, pos, idx);
+	}
 	buf[pos] = '\0';
 }
 
@@ -37,7 +53,7 @@ static int	open_forks(t_data *data)
 		return (1);
 	for (i = 0; i < data->n_ph; i++)
 	{
-		fork_name(name, i);
+		sem_name(name, SEM_FORK_PREFIX, data->instance_id, i);
 		sem_unlink(name);
 		data->forks[i] = sem_open(name, O_CREAT, 0644, 1);
 		if (data->forks[i] == SEM_FAILED)
@@ -48,8 +64,10 @@ static int	open_forks(t_data *data)
 
 int	init_data(t_data *data, char **av)
 {
-	int	room_capacity;
+	char	name[64];
+	int		room_capacity;
 
+	data->instance_id = (unsigned long)unique_id() ^ (uintptr_t)data;
 	data->n_ph = ft_atoi(av[1]);
 	data->die_time = ft_atoi(av[2]);
 	data->eat_time = ft_atoi(av[3]);
@@ -59,11 +77,13 @@ int	init_data(t_data *data, char **av)
 		data->must_eat = ft_atoi(av[5]);
 	if (open_forks(data))
 		return (1);
-	sem_unlink(SEM_ROOM);
-	sem_unlink(SEM_PRINT);
 	room_capacity = (data->n_ph > 1) ? data->n_ph - 1 : 1;
-	data->room = sem_open(SEM_ROOM, O_CREAT, 0644, room_capacity);
-	data->print_lock = sem_open(SEM_PRINT, O_CREAT, 0644, 1);
+	sem_name(name, SEM_ROOM_PREFIX, data->instance_id, -1);
+	sem_unlink(name);
+	data->room = sem_open(name, O_CREAT, 0644, room_capacity);
+	sem_name(name, SEM_PRINT_PREFIX, data->instance_id, -1);
+	sem_unlink(name);
+	data->print_lock = sem_open(name, O_CREAT, 0644, 1);
 	if (data->room == SEM_FAILED || data->print_lock == SEM_FAILED)
 		return (1);
 	data->t0 = get_time();
@@ -77,13 +97,15 @@ void	destroy_data(t_data *data)
 
 	for (i = 0; i < data->n_ph; i++)
 	{
-		fork_name(name, i);
+		sem_name(name, SEM_FORK_PREFIX, data->instance_id, i);
 		sem_close(data->forks[i]);
 		sem_unlink(name);
 	}
 	free(data->forks);
 	sem_close(data->room);
 	sem_close(data->print_lock);
-	sem_unlink(SEM_ROOM);
-	sem_unlink(SEM_PRINT);
+	sem_name(name, SEM_ROOM_PREFIX, data->instance_id, -1);
+	sem_unlink(name);
+	sem_name(name, SEM_PRINT_PREFIX, data->instance_id, -1);
+	sem_unlink(name);
 }

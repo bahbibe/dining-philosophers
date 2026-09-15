@@ -1,40 +1,31 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   thread.c                                           :+:      :+:    :+:   */
+/*   time_utils.c                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: bahbibe <bahbibe@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2024/08/02 02:11:20 by bahbibe           #+#    #+#             */
-/*   Updated: 2024/08/02 02:12:35 by bahbibe          ###   ########.fr       */
+/*   Created: 2026/09/14 00:00:00 by bahbibe           #+#    #+#             */
+/*   Updated: 2026/09/15 00:00:00 by bahbibe          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "philo.h"
+#include "philo_bonus.h"
 
-void	join_threads(t_philo *philo)
+long	get_time(void)
 {
-	int	i;
+	struct timeval	tv;
 
-	i = 0;
-	while (i < philo[0].data->n_ph)
-	{
-		pthread_join(philo[i].thread, NULL);
-		i++;
-	}
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
-int	create_philo(t_philo *philo)
+void	precise_sleep(int ms)
 {
-	int	i;
+	long	start;
 
-	i = 0;
-	while (i < philo[0].data->n_ph)
-	{
-		if (pthread_create(&philo[i].thread, NULL, &simulate, &philo[i]))
-			return (printf("error creating philos"));
-		i += 1;
-		usleep(10);
-	}
-	return (0);
+	start = get_time();
+	usleep(ms * 1000 * 0.9);
+	while (get_time() - start < ms)
+		usleep(100);
 }

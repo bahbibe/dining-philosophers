@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_atoi.c                                          :+:      :+:    :+:   */
+/*   parsing.c                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: bahbibe <bahbibe@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2022/10/17 18:44:56 by bahbibe           #+#    #+#             */
-/*   Updated: 2023/05/12 06:21:25 by bahbibe          ###   ########.fr       */
+/*   Created: 2026/09/15 00:00:00 by bahbibe           #+#    #+#             */
+/*   Updated: 2026/09/15 00:00:00 by bahbibe          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,8 +14,8 @@
 
 int	ft_is_space(int c)
 {
-	return (c == '\f' || c == '\n' || c == '\r' \
-	|| c == '\t' || c == '\v' || c == ' ');
+	return (c == '\f' || c == '\n' || c == '\r'
+		|| c == '\t' || c == '\v' || c == ' ');
 }
 
 int	ft_isdigit(int c)
@@ -35,17 +35,40 @@ int	ft_atoi(const char *str)
 	while (ft_is_space((int)str[i]))
 		i++;
 	if (str[i] == '-' || str[i] == '+')
-	{
-		if (str[i] == '-')
-			sign *= -1;
-		i++;
-	}
+		sign = (str[i++] == '-') ? -1 : 1;
 	while (ft_isdigit(str[i]))
 	{
-		res = res * 10 + (str[i] - 48);
+		res = res * 10 + (str[i] - '0');
 		i++;
-		if ((res * -1 < (long)INT_MIN) || (res > (long)INT_MAX && sign == 1))
+		if (res * -1 < (long)INT_MIN || (res > (long)INT_MAX && sign == 1))
 			return (-1);
 	}
 	return ((int)res * sign);
+}
+
+/* Only accepts plain digit strings: no sign, no spaces. -1 on anything else. */
+int	get_arg(char *arg)
+{
+	int	i;
+
+	for (i = 0; arg[i]; i++)
+		if (!ft_isdigit(arg[i]))
+			return (-1);
+	return (ft_atoi(arg));
+}
+
+/* Every argument (av[1..]) must be a strictly positive integer. */
+int	check_args(char **av)
+{
+	int	i;
+
+	for (i = 1; av[i]; i++)
+	{
+		if (get_arg(av[i]) <= 0)
+		{
+			printf("./philo: positive numeric argument required\n");
+			return (1);
+		}
+	}
+	return (0);
 }

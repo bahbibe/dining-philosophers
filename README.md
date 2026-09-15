@@ -1,59 +1,110 @@
-# 42 Philosophers 
+*This project has been created as part of the 42 curriculum by bahbibe.*
 
+# Philosophers
 
 <p align="center">
-  <img width="500" hight="500" align="center" alt="Dining Philosophers" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/An_illustration_of_the_dining_philosophers_problem.png/1024px-        An_illustration_of_the_dining_philosophers_problem.png" > 
-</p>
-<p  align="center">
-
-<em>
- The famous “Dining Philosophers Problem”
-</em>
+  <img width="500" alt="Dining Philosophers" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/An_illustration_of_the_dining_philosophers_problem.png/1024px-An_illustration_of_the_dining_philosophers_problem.png">
 </p>
 
-## [The dining philosophers problem](https://en.wikipedia.org/wiki/Dining_philosophers_problem) is a famous problem in computer science used to illustrate common issues in [concurrent programming](https://en.wikipedia.org/wiki/Concurrency_(computer_science)).
----
-# Introduction
+## Description
 
-## The Dining Philosophers problem involves philosophers sitting around a circular table. Each philosopher has a plate of spaghetti and needs [two forks]() to eat. The number of forks on the table equal to number of philosophers, one between each pair of plates. The challenge is to design a system where each philosopher can eat without causing deadlocks or starvation.This project implements a solution to the problem using C and [pthreads](https://www.man7.org/linux/man-pages/man7/pthreads.7.html). It demonstrates concurrent programming concepts, resource sharing, and deadlock prevention.
+This project is an implementation of the classic [dining philosophers
+problem](https://en.wikipedia.org/wiki/Dining_philosophers_problem), used to
+illustrate deadlock and starvation in [concurrent
+programming](https://en.wikipedia.org/wiki/Concurrency_(computer_science)).
 
----
-# Imagine a scenario
+A number of philosophers sit at a round table with one fork between each
+pair of them. Each philosopher endlessly cycles through eating, sleeping and
+thinking, and needs both their left and right fork to eat. A philosopher who
+does not start eating before `time_to_die` milliseconds have passed since
+their last meal (or since the simulation started) dies, and the simulation
+stops.
 
-There are five philosophers sitting around a circular table.
-Each philosopher has a plate of spaghetti in front of them.
-Between each pair of plates is one fork **(so five forks total).**
-To eat, a philosopher needs two forks - one from their left and one from their right.
-How can we design a system where each philosopher can eat without causing a deadlock (where everyone is stuck waiting forever) or starvation (where someone never gets to eat)?
+The project has two parts:
 
+- **`philo/`** (mandatory): each philosopher is a `pthread`, forks are
+  `pthread_mutex_t`.
+- **`philo_bonus/`** (bonus): each philosopher is its own process (`fork`),
+  forks are represented by a POSIX semaphore.
 
-# Implementation
-The solution uses the following key components:
-### Philosophers as `threads`
-Each philosopher can be represented as a separate thread in C. These threads run concurrently, just like the philosophers thinking and eating independently.
-```c
-void* simulate(void* data)
-{
-    // Philosopher's actions (thinking, picking up forks, eating, putting down forks and sleeping ...)
-}
+The mandatory part has to avoid both **deadlock** (everyone holding one fork,
+waiting forever for the other) and **starvation** (one philosopher
+permanently losing the race for a fork to its neighbours) using only mutexes
+— no semaphores or condition variables are allowed there.
+
+## Instructions
+
+Build:
+
+```sh
+cd philo && make        # or: cd philo_bonus && make
 ```
-### Forks as shared resources 
-The forks represent shared resources that multiple threads (philosophers) need to access. In C, we can represent these as **`mutex locks`**.
-```c
-pthread_mutex_t forks[5];
-```
-Picking up forks as locking:
-When a philosopher picks up a fork, it's like a thread acquiring a lock on a shared resource.
 
-```c
-pthread_mutex_lock(&forks[left_fork]);
-pthread_mutex_lock(&forks[right_fork]);
+Run:
+
+```sh
+./philo number_of_philosophers time_to_die time_to_eat time_to_sleep [number_of_times_each_philosopher_must_eat]
 ```
-Putting down forks as unlocking:
-When a philosopher puts down the forks, it's like a thread releasing the locks.
-```c
-pthread_mutex_unlock(&forks[left_fork]);
-pthread_mutex_unlock(&forks[right_fork]);
+
+- `number_of_philosophers` — also the number of forks.
+- `time_to_die`, `time_to_eat`, `time_to_sleep` — in milliseconds.
+- `number_of_times_each_philosopher_must_eat` — optional; if given, the
+  simulation stops once every philosopher has eaten that many times, instead
+  of running until someone dies.
+
+Examples:
+
+```sh
+./philo 5 800 200 200      # runs until a philosopher dies (or forever if none does)
+./philo 5 800 200 200 7    # stops once everyone has eaten 7 times
 ```
-# Deadlock scenario
-If each philosopher picks up the left fork and waits for the right fork, we have a deadlock. This is similar to multiple threads each holding one resource and waiting for another, creating a circular dependency.
+
+`make clean`, `make fclean`, `make re` behave as usual.
+
+## Technical notes
+
+- **Deadlock avoidance**: all philosophers pick up their forks in the same
+  order (left, then right). Deadlock is prevented by a mutex-protected
+  "room" counter that lets at most `n - 1` philosophers attempt to pick up
+  forks at the same time — with `n` forks and at most `n - 1` philosophers
+  competing, at least one of them can always get both of theirs.
+- **Starvation mitigation**: room admission additionally gives priority to
+  whichever waiting philosopher has gone longest without eating, instead of
+  first-come-first-served. Without real-time scheduling guarantees this is a
+  mitigation, not a formal proof — see the note below.
+- Every log line carries the elapsed time in milliseconds since the start of
+  the simulation, and is only ever printed while the simulation is still
+  running, so a death message can't race with a state message printed after
+  the fact.
+
+### Known limitation
+
+The mandatory subject forbids semaphores and condition variables, so there is
+no OS-level FIFO queue to fall back on for forks — fairness comes only from
+the room + priority scheme above. Under an artificially tight, perfectly
+lockstepped stress test (fresh process, `n` philosophers, `time_to_die`
+exactly `2×(time_to_eat+time_to_sleep)`, run back-to-back many times) a
+philosopher can, rarely, still lose two consecutive fork races and die right
+at the deadline. This was reduced from a near-certain failure to an
+occasional one during this review; closing it completely would need a real
+FIFO ticket queue, which is out of scope for a mutex-only mandatory part.
+
+## Resources
+
+- [Dining philosophers problem — Wikipedia](https://en.wikipedia.org/wiki/Dining_philosophers_problem)
+- [pthreads(7) man page](https://man7.org/linux/man-pages/man7/pthreads.7.html)
+- `man pthread_mutex_lock`, `man pthread_create`, `man sem_overview`
+- E.W. Dijkstra's original 1965 formulation of the problem (via the
+  Wikipedia article above) for the "waiter"/arbitrator solution to
+  starvation.
+
+**AI usage**: AI (Claude, Anthropic) was used during this project's review
+pass to: read the subject PDF and diff its requirements against the existing
+code, locate and explain three concurrency bugs (a self-deadlock with a
+single philosopher, a death-timer that measured the wrong window, and a
+false-death after a philosopher had already met its required meal count),
+design and implement the mutex-only fairness fix described above, restructure
+the repository into `philo/`/`philo_bonus/`, write the `philo_bonus`
+process+semaphore implementation, and draft this README. Every change was
+reviewed, tested (including repeated stress runs of the classic
+`5 800 200 200` benchmark), and understood before being kept.
